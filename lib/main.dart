@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const FireNotesApp());
 }
 
@@ -33,7 +36,7 @@ class HomeScreen extends StatelessWidget {
       ),
       body: const Center(
         child: Text(
-          'Welcome to FireNotes',
+          'Firebase Initialized',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
       ),
