@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/note_model.dart';
 import '../repositories/notes_repository.dart';
 import '../services/auth_service.dart';
@@ -11,20 +12,18 @@ class NotesScreen extends StatefulWidget {
 }
 
 class _NotesScreenState extends State<NotesScreen> {
-  final AuthService _authService = AuthService();
-  // Deprecated direct service usage; replaced with Repository contract
-  final INotesRepository _notesRepository = NotesRepository();
-
   void _showNoteDialog({NoteModel? note}) {
     final titleController = TextEditingController(text: note?.title ?? '');
     final contentController = TextEditingController(text: note?.content ?? '');
-    final uid = _authService.currentUid;
+    final authService = context.read<AuthService>();
+    final notesRepo = context.read<INotesRepository>();
+    final uid = authService.currentUid;
 
     if (uid == null) return;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(note == null ? 'New Note' : 'Edit Note'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -49,7 +48,7 @@ class _NotesScreenState extends State<NotesScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
@@ -59,13 +58,13 @@ class _NotesScreenState extends State<NotesScreen> {
 
               if (title.isNotEmpty) {
                 if (note == null) {
-                  await _notesRepository.addNote(
+                  await notesRepo.addNote(
                     uid: uid,
                     title: title,
                     content: content,
                   );
                 } else {
-                  await _notesRepository.updateNote(
+                  await notesRepo.updateNote(
                     uid: uid,
                     noteId: note.id,
                     title: title,
@@ -73,7 +72,7 @@ class _NotesScreenState extends State<NotesScreen> {
                   );
                 }
               }
-              if (mounted) Navigator.pop(context);
+              if (mounted) Navigator.pop(dialogContext);
             },
             child: Text(note == null ? 'Create' : 'Save'),
           ),
@@ -83,14 +82,18 @@ class _NotesScreenState extends State<NotesScreen> {
   }
 
   Future<void> _deleteNote(String noteId) async {
-    final uid = _authService.currentUid;
+    final authService = context.read<AuthService>();
+    final notesRepo = context.read<INotesRepository>();
+    final uid = authService.currentUid;
     if (uid == null) return;
-    await _notesRepository.deleteNote(uid: uid, noteId: noteId);
+    await notesRepo.deleteNote(uid: uid, noteId: noteId);
   }
 
   @override
   Widget build(BuildContext context) {
-    final uid = _authService.currentUid;
+    final authService = context.watch<AuthService>();
+    final notesRepo = context.watch<INotesRepository>();
+    final uid = authService.currentUid;
 
     return Scaffold(
       appBar: AppBar(
@@ -100,14 +103,14 @@ class _NotesScreenState extends State<NotesScreen> {
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Logout',
-            onPressed: () => _authService.signOut(),
+            onPressed: () => authService.signOut(),
           ),
         ],
       ),
       body: uid == null
           ? const Center(child: Text('No user logged in'))
           : StreamBuilder<List<NoteModel>>(
-        stream: _notesRepository.getNotes(uid),
+        stream: notesRepo.getNotes(uid),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -150,8 +153,7 @@ class _NotesScreenState extends State<NotesScreen> {
                   ),
                   onTap: () => _showNoteDialog(note: note),
                   trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        color: Colors.red),
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
                     onPressed: () => _deleteNote(note.id),
                   ),
                 ),
