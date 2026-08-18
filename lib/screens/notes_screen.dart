@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/note_model.dart';
+import '../repositories/notes_repository.dart';
 import '../services/auth_service.dart';
-import '../services/notes_service.dart';
 
 class NotesScreen extends StatefulWidget {
   const NotesScreen({super.key});
@@ -12,7 +12,8 @@ class NotesScreen extends StatefulWidget {
 
 class _NotesScreenState extends State<NotesScreen> {
   final AuthService _authService = AuthService();
-  final NotesService _notesService = NotesService();
+  // Deprecated direct service usage; replaced with Repository contract
+  final INotesRepository _notesRepository = NotesRepository();
 
   void _showNoteDialog({NoteModel? note}) {
     final titleController = TextEditingController(text: note?.title ?? '');
@@ -58,13 +59,13 @@ class _NotesScreenState extends State<NotesScreen> {
 
               if (title.isNotEmpty) {
                 if (note == null) {
-                  await _notesService.createNote(
+                  await _notesRepository.addNote(
                     uid: uid,
                     title: title,
                     content: content,
                   );
                 } else {
-                  await _notesService.updateNote(
+                  await _notesRepository.updateNote(
                     uid: uid,
                     noteId: note.id,
                     title: title,
@@ -84,7 +85,7 @@ class _NotesScreenState extends State<NotesScreen> {
   Future<void> _deleteNote(String noteId) async {
     final uid = _authService.currentUid;
     if (uid == null) return;
-    await _notesService.deleteNote(uid: uid, noteId: noteId);
+    await _notesRepository.deleteNote(uid: uid, noteId: noteId);
   }
 
   @override
@@ -106,7 +107,7 @@ class _NotesScreenState extends State<NotesScreen> {
       body: uid == null
           ? const Center(child: Text('No user logged in'))
           : StreamBuilder<List<NoteModel>>(
-        stream: _notesService.streamNotes(uid),
+        stream: _notesRepository.getNotes(uid),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -149,7 +150,8 @@ class _NotesScreenState extends State<NotesScreen> {
                   ),
                   onTap: () => _showNoteDialog(note: note),
                   trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    icon: const Icon(Icons.delete_outline,
+                        color: Colors.red),
                     onPressed: () => _deleteNote(note.id),
                   ),
                 ),
