@@ -1,38 +1,32 @@
 import 'dart:io';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloudinary_public/cloudinary_public.dart';
 
 class StorageService {
-  final FirebaseStorage _storage;
+  static const String _cloudName = 'cnnsozts';
+  static const String _uploadPreset = 'pd2morax';
 
-  StorageService({FirebaseStorage? storage})
-      : _storage = storage ?? FirebaseStorage.instance;
+  final CloudinaryPublic _cloudinary;
 
-  /// Uploads an image file to users/{uid}/note_images/ and returns the public download URL.
+  StorageService({CloudinaryPublic? cloudinary})
+      : _cloudinary = cloudinary ??
+      CloudinaryPublic(_cloudName, _uploadPreset, cache: false);
+
+  /// Uploads an image file to Cloudinary and returns the public HTTPS download URL.
   Future<String> uploadNoteImage({
     required String uid,
     required File imageFile,
   }) async {
     try {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final ref = _storage.ref().child('users/$uid/note_images/$fileName');
-
-      final uploadTask = await ref.putFile(imageFile);
-      return await uploadTask.ref.getDownloadURL();
-    } on FirebaseException catch (e) {
-      throw Exception('Storage upload error (${e.code}): ${e.message}');
-    }
-  }
-
-  /// Deletes an image from Firebase Storage given its full HTTPS URL.
-  Future<void> deleteImageByUrl(String imageUrl) async {
-    try {
-      final ref = _storage.refFromURL(imageUrl);
-      await ref.delete();
-    } on FirebaseException catch (e) {
-      // Ignore if file was already deleted or not found
-      if (e.code != 'object-not-found') {
-        throw Exception('Storage delete error (${e.code}): ${e.message}');
-      }
+      final response = await _cloudinary.uploadFile(
+        CloudinaryFile.fromFile(
+          imageFile.path,
+          resourceType: CloudinaryResourceType.Image,
+          folder: 'users/$uid/note_images',
+        ),
+      );
+      return response.secureUrl;
+    } catch (e) {
+      throw Exception('Cloudinary upload error: $e');
     }
   }
 }
