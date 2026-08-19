@@ -27,10 +27,12 @@ class NotesService {
     required String uid,
     required String title,
     required String content,
+    String? imageUrl,
   }) async {
     final noteData = {
       'title': title,
       'content': content,
+      if (imageUrl != null) 'imageUrl': imageUrl,
       'createdAt': FieldValue.serverTimestamp(),
     };
     await _userNotesRef(uid).add(noteData);
@@ -42,12 +44,15 @@ class NotesService {
     required String noteId,
     required String title,
     required String content,
+    String? imageUrl,
   }) async {
-    await _userNotesRef(uid).doc(noteId).update({
+    final noteData = {
       'title': title,
       'content': content,
+      if (imageUrl != null) 'imageUrl': imageUrl,
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    };
+    await _userNotesRef(uid).doc(noteId).update(noteData);
   }
 
   /// Deletes a note under users/{uid}/notes/{noteId}.
