@@ -21,6 +21,7 @@ class _NotesScreenState extends State<NotesScreen> {
     final contentController = TextEditingController(text: note?.content ?? '');
     File? selectedImage;
     bool isUploading = false;
+    String statusMessage = '';
 
     final authService = context.read<AuthService>();
     final notesRepo = context.read<INotesRepository>();
@@ -34,79 +35,116 @@ class _NotesScreenState extends State<NotesScreen> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) {
           Future<void> pickImage(ImageSource source) async {
-            final pickedFile = await _picker.pickImage(
-              source: source,
-              imageQuality: 70, // Optimize upload payload size
-            );
-            if (pickedFile != null) {
-              setDialogState(() {
-                selectedImage = File(pickedFile.path);
-              });
+            try {
+              final pickedFile = await _picker.pickImage(
+                source: source,
+                imageQuality: 70,
+              );
+              if (pickedFile != null) {
+                setDialogState(() {
+                  selectedImage = File(pickedFile.path);
+                });
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error picking image: $e')),
+                );
+              }
             }
           }
 
           return AlertDialog(
             title: Text(note == null ? 'New Note' : 'Edit Note'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: titleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Title',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: contentController,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      labelText: 'Content',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (selectedImage != null) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        selectedImage!,
-                        height: 150,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+            content: SizedBox(
+              width: double.maxFinite, // Fixes RenderIntrinsicWidth layout crash
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: titleController,
+                      enabled: !isUploading,
+                      decoration: const InputDecoration(
+                        labelText: 'Title',
+                        border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                  ] else if (note?.imageUrl != null && note!.imageUrl!.isNotEmpty) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        note.imageUrl!,
-                        height: 150,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: contentController,
+                      enabled: !isUploading,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Content',
+                        border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                  ],
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      TextButton.icon(
-                        onPressed: () => pickImage(ImageSource.gallery),
-                        icon: const Icon(Icons.photo_library),
-                        label: const Text('Gallery'),
+                    const SizedBox(height: 12),
+                    if (selectedImage != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          selectedImage!,
+                          height: 150,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
                       ),
-                      TextButton.icon(
-                        onPressed: () => pickImage(ImageSource.camera),
-                        icon: const Icon(Icons.camera_alt),
-                        label: const Text('Camera'),
+                      const SizedBox(height: 8),
+                    ] else if (note?.imageUrl != null && note!.imageUrl!.isNotEmpty) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          note.imageUrl!,
+                          height: 150,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.broken_image, size: 40),
+                        ),
                       ),
+                      const SizedBox(height: 8),
                     ],
-                  ),
-                ],
+                    if (isUploading) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            statusMessage,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.blueGrey,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () => pickImage(ImageSource.gallery),
+                            icon: const Icon(Icons.photo_library),
+                            label: const Text('Gallery'),
+                          ),
+                          TextButton.icon(
+                            onPressed: () => pickImage(ImageSource.camera),
+                            icon: const Icon(Icons.camera_alt),
+                            label: const Text('Camera'),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
               ),
             ),
             actions: [
@@ -121,11 +159,16 @@ class _NotesScreenState extends State<NotesScreen> {
                   final title = titleController.text.trim();
                   final content = contentController.text.trim();
 
-                  if (title.isNotEmpty) {
-                    setDialogState(() {
-                      isUploading = true;
-                    });
+                  if (title.isEmpty) return;
 
+                  setDialogState(() {
+                    isUploading = true;
+                    statusMessage = selectedImage != null
+                        ? 'Uploading image...'
+                        : 'Saving note...';
+                  });
+
+                  try {
                     if (note == null) {
                       await notesRepo.addNote(
                         uid: uid,
@@ -142,16 +185,22 @@ class _NotesScreenState extends State<NotesScreen> {
                         imageUrl: note.imageUrl,
                       );
                     }
+                    if (mounted) Navigator.pop(dialogContext);
+                  } catch (e) {
+                    setDialogState(() {
+                      isUploading = false;
+                    });
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to save note: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
-                  if (mounted) Navigator.pop(dialogContext);
                 },
-                child: isUploading
-                    ? const SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                    : Text(note == null ? 'Create' : 'Save'),
+                child: Text(note == null ? 'Create' : 'Save'),
               ),
             ],
           );
@@ -230,6 +279,8 @@ class _NotesScreenState extends State<NotesScreen> {
                         height: 180,
                         width: double.infinity,
                         fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox.shrink(),
                       ),
                     ListTile(
                       title: Text(
