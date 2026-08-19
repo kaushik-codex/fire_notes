@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'services/auth_service.dart';
 import 'services/notes_service.dart';
+import 'services/notification_service.dart';
 import 'repositories/notes_repository.dart';
 import 'screens/auth_screen.dart';
 import 'screens/notes_screen.dart';
@@ -11,11 +12,16 @@ import 'screens/notes_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  runApp(const FireNotesApp());
-}
 
+  // Initialize notification handling
+  final notificationService = NotificationService();
+  await notificationService.initialize();
+
+  runApp(FireNotesApp(notificationService: notificationService));
+}
 class FireNotesApp extends StatelessWidget {
-  const FireNotesApp({super.key});
+  final NotificationService notificationService;
+  const FireNotesApp({super.key, required this.notificationService});
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +32,9 @@ class FireNotesApp extends StatelessWidget {
         ),
         Provider<NotesService>(
           create: (_) => NotesService(),
+        ),
+        Provider<NotificationService>.value(
+            value: notificationService
         ),
         ProxyProvider<NotesService, INotesRepository>(
           update: (_, notesService, __) => NotesRepository(notesService: notesService),
