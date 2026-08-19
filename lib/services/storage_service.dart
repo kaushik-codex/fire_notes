@@ -29,4 +29,14 @@ class StorageService {
       throw Exception('Cloudinary upload error: $e');
     }
   }
+
+  Future<void> deleteImageByUrl(String imageUrl) async {
+    try {
+      // NOTE: Direct client-side deletion isn't supported securely by cloudinary_public.
+      // If we have a backend server later, we can make an HTTP call here to delete it.
+      print('Cloudinary delete requested for: $imageUrl');
+    } catch (e) {
+      throw Exception('Cloudinary delete error: $e');
+    }
+  }
 }
