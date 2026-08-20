@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:provider/provider.dart';
 import 'services/auth_service.dart';
 import 'services/notes_service.dart';
@@ -13,14 +15,30 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
+  // Activate Firebase App Check to secure backend services
+  await FirebaseAppCheck.instance.activate(
+    androidProvider: kDebugMode
+        ? AndroidProvider.debug
+        : AndroidProvider.playIntegrity,
+    appleProvider: kDebugMode
+        ? AppleProvider.debug
+        : AppleProvider.appAttest,
+  );
+
   // Initialize notification handling
   final notificationService = NotificationService();
   await notificationService.initialize();
 
+  // Fetch and log FCM token on startup
+  final token = await notificationService.getDeviceToken();
+  debugPrint('=== FCM TOKEN ===: $token');
+
   runApp(FireNotesApp(notificationService: notificationService));
 }
+
 class FireNotesApp extends StatelessWidget {
   final NotificationService notificationService;
+
   const FireNotesApp({super.key, required this.notificationService});
 
   @override
@@ -34,10 +52,11 @@ class FireNotesApp extends StatelessWidget {
           create: (_) => NotesService(),
         ),
         Provider<NotificationService>.value(
-            value: notificationService
+          value: notificationService,
         ),
         ProxyProvider<NotesService, INotesRepository>(
-          update: (_, notesService, __) => NotesRepository(notesService: notesService),
+          update: (_, notesService, __) =>
+              NotesRepository(notesService: notesService),
         ),
       ],
       child: MaterialApp(
