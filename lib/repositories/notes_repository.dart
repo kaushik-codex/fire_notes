@@ -2,6 +2,7 @@ import 'dart:io';
 import '../models/note_model.dart';
 import '../services/notes_service.dart';
 import '../services/storage_service.dart';
+import '../services/performance_service.dart';
 
 abstract class INotesRepository {
   Stream<List<NoteModel>> getNotes(String uid);
@@ -27,12 +28,15 @@ abstract class INotesRepository {
 class NotesRepository implements INotesRepository {
   final NotesService _notesService;
   final StorageService _storageService;
+  final PerformanceService _perfService;
 
   NotesRepository({
     NotesService? notesService,
     StorageService? storageService,
+    PerformanceService? perfService,
   })  : _notesService = notesService ?? NotesService(),
-        _storageService = storageService ?? StorageService();
+        _storageService = storageService ?? StorageService(),
+        _perfService = perfService ?? PerformanceService();
 
   @override
   Stream<List<NoteModel>> getNotes(String uid) {
@@ -46,19 +50,27 @@ class NotesRepository implements INotesRepository {
     required String content,
     File? imageFile,
   }) async {
-    String? imageUrl;
-    if (imageFile != null) {
-      imageUrl = await _storageService.uploadNoteImage(
-        uid: uid,
-        imageFile: imageFile,
-      );
-    }
+    await _perfService.traceOperation(
+      traceName: 'create_note_trace',
+      attributes: {
+        'has_image': (imageFile != null).toString(),
+      },
+      operation: () async {
+        String? imageUrl;
+        if (imageFile != null) {
+          imageUrl = await _storageService.uploadNoteImage(
+            uid: uid,
+            imageFile: imageFile,
+          );
+        }
 
-    await _notesService.createNote(
-      uid: uid,
-      title: title,
-      content: content,
-      imageUrl: imageUrl,
+        await _notesService.createNote(
+          uid: uid,
+          title: title,
+          content: content,
+          imageUrl: imageUrl,
+        );
+      },
     );
   }
 
