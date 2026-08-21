@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 import 'services/auth_service.dart';
 import 'services/notes_service.dart';
@@ -23,6 +24,11 @@ Future<void> main() async {
     appleProvider: kDebugMode
         ? AppleProvider.debug
         : AppleProvider.appAttest,
+  );
+
+  // Initialize Google Sign-In with your Web Client ID
+  await GoogleSignIn.instance.initialize(
+    serverClientId: AuthService.webClientId,
   );
 
   // Initialize notification handling
